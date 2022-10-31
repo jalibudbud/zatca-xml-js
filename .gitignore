@@ -109,3 +109,5 @@ dist
 /src/tests
 .DS_STORE
 /public/exported-xml
+/public/metadata
+.vscode
