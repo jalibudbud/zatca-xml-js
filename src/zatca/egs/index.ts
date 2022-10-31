@@ -118,17 +118,23 @@ const generateCSR = async (egs_info: EGSUnitInfo, production: boolean, solution_
     }
 }
 
-
-
-
 export class EGS {
 
     private egs_info: EGSUnitInfo;
     private api: API;
+    private solution_name: any;
+    public options: {private_key_file?: any, public_key_file?: any, csr_config_file?: any, csr_file?: any} = {};
 
-    constructor(egs_info: EGSUnitInfo) {
+    constructor(egs_info: EGSUnitInfo, solution_name: string = 'EGSSolutionName') {
+        this.solution_name = solution_name;
         this.egs_info = egs_info;
         this.api = new API();
+        this.options = {
+            private_key_file: `${process.env.APP_PATH}/public/metadata/${egs_info.custom_id}-${solution_name}-private.pem`,
+            public_key_file: `${process.env.APP_PATH}/public/metadata/${egs_info.custom_id}-${solution_name}-public.pem`,
+            csr_config_file: `${process.env.APP_PATH}/public/metadata/${egs_info.custom_id}-${solution_name}.cnf`,
+            csr_file: `${process.env.APP_PATH}/public/metadata/${egs_info.custom_id}-${solution_name}.csr`
+        }
     }
 
 
@@ -166,6 +172,51 @@ export class EGS {
             throw error;
         }
     }
+
+    async generateCSR(production: boolean): Promise<string> {
+        const egs_info: EGSUnitInfo = this.egs_info;
+
+        fs.writeFileSync(this.options.csr_config_file, defaultCSRConfig({
+            egs_model: egs_info.model,
+            egs_serial_number: egs_info.uuid,
+            solution_name: this.solution_name,
+            vat_number: egs_info.VAT_number,
+            branch_location: `${egs_info.location.building} ${egs_info.location.street}, ${egs_info.location.city}`,
+            branch_industry: egs_info.branch_industry,
+            branch_name: egs_info.branch_name,
+            taxpayer_name: egs_info.VAT_name,
+            taxpayer_provided_id: egs_info.custom_id,
+            production: production
+        }));
+        
+        try {    
+            const { private_key_file, csr_config_file, csr_file } = this.options;
+
+            // Generate CSR file
+            // await OpenSSL(["req", "-new", "-sha256", "-key", private_key_file, "-extensions", "v3_req", "-config", csr_config_file, "-out", csr_file]);
+    
+            const result = await OpenSSL(["req", "-new", "-sha256", "-key", private_key_file, "-config", csr_config_file]);
+            if (!result.includes("-----BEGIN CERTIFICATE REQUEST-----")) throw new Error("Error no CSR found in OpenSSL output.");
+    
+            let csr: string = `-----BEGIN CERTIFICATE REQUEST-----${result.split("-----BEGIN CERTIFICATE REQUEST-----")[1]}`.trim();
+            return csr;
+        } catch (error) {
+            throw error;
+        }
+    }
+
+    async generateKeys(production: boolean) {
+        const { private_key_file, public_key_file } = this.options;
+
+        // Generate Private Key
+        const new_private_key = await generateSecp256k1KeyPair();
+        fs.writeFileSync(private_key_file, new_private_key);
+
+        // Generate Public Key
+        await OpenSSL(["ec", "-in", private_key_file, "-pubout", "-conv_form", "compressed", "-out", public_key_file]);
+    }
+
+    
 
 
     /**
