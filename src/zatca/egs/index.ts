@@ -205,7 +205,21 @@ export class EGS {
         }
     }
 
-    async generateKeys(production: boolean) {
+    async getCSR() {
+        try {
+            const { private_key_file, csr_config_file } = this.options;
+            const result = await OpenSSL(["req", "-new", "-sha256", "-key", private_key_file, "-config", csr_config_file]);
+            if (!result.includes("-----BEGIN CERTIFICATE REQUEST-----")) throw new Error("Error no CSR found in OpenSSL output.");
+    
+            let csr: string = `-----BEGIN CERTIFICATE REQUEST-----${result.split("-----BEGIN CERTIFICATE REQUEST-----")[1]}`.trim();
+            this.egs_info.csr = csr;
+            return csr;
+        } catch (error) {
+            throw error;
+        }
+    }
+
+    async generateKeys() {
         const { private_key_file, public_key_file } = this.options;
 
         // Generate Private Key
@@ -216,8 +230,16 @@ export class EGS {
         await OpenSSL(["ec", "-in", private_key_file, "-pubout", "-conv_form", "compressed", "-out", public_key_file]);
     }
 
-    
-
+    getKeys() {
+        const { private_key_file, public_key_file } = this.options;
+        
+        try {    
+            const privatekey = fs.readFileSync(private_key_file, { encoding: "utf8" });
+            this.egs_info.private_key = privatekey;
+        } catch (error) {
+            throw error;
+        }
+    }
 
     /**
      * Generates a new compliance certificate through ZATCA API.

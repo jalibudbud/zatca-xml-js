@@ -75,8 +75,9 @@ class API {
                 OTP: otp
             };
 
+            const base64CSR = Buffer.from(csr).toString("base64");
             const response = await axios.post(`${settings.SANDBOX_BASEURL}/compliance`,
-                {csr: Buffer.from(csr).toString("base64")},
+                {csr: base64CSR},
                 {headers: {...auth_headers, ...headers}}
             );
                         
