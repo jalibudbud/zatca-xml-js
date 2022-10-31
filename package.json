@@ -7,6 +7,10 @@
     "lib/**/*"
   ],
   "scripts": {
+    "e2etest": "node -r dotenv/config ./public/e2e-test.js",
+    "generatecsr": "node -r dotenv/config ./public/generate-csr.js",
+    "genereatekeys": "node -r dotenv/config ./public/generate-keys.js",
+    "generatekeys_csr": "npm run genereatekeys && npm run generatecsr",
     "build": "tsc --project tsconfig.build.json",
     "test": "tsc && node testing_lib/tests/test.js",
     "example": "tsc --project tsconfig.build.json && node lib/examples/full.js",
@@ -22,6 +26,7 @@
   "dependencies": {
     "@fidm/x509": "^1.2.1",
     "axios": "^0.27.2",
+    "dotenv": "^16.0.3",
     "fast-xml-parser": "^4.0.9",
     "lodash": "^4.17.21",
     "moment": "^2.29.4",
