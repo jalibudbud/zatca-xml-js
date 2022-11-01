@@ -83,7 +83,7 @@ class API {
                         
             if (response.status != 200) throw new Error("Error issuing a compliance certificate.");
 
-            let issued_certificate = new Buffer(response.data.binarySecurityToken, "base64").toString();
+            let issued_certificate = Buffer.from(response.data.binarySecurityToken, "base64").toString();
             issued_certificate = `-----BEGIN CERTIFICATE-----\n${issued_certificate}\n-----END CERTIFICATE-----`;
             const api_secret = response.data.secret;
 
@@ -131,7 +131,7 @@ class API {
                         
             if (response.status != 200) throw new Error("Error issuing a production certificate.");
 
-            let issued_certificate = new Buffer(response.data.binarySecurityToken, "base64").toString();
+            let issued_certificate = Buffer.from(response.data.binarySecurityToken, "base64").toString();
             issued_certificate = `-----BEGIN CERTIFICATE-----\n${issued_certificate}\n-----END CERTIFICATE-----`;
             const api_secret = response.data.secret;
 
