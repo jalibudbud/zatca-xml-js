@@ -12,6 +12,7 @@ import fs from "fs";
 import defaultCSRConfig from "../templates/csr_template";
 import API from "../api";
 import { ZATCASimplifiedTaxInvoice } from "../ZATCASimplifiedTaxInvoice";
+import { AltavantUtil } from '../altavant-util';
 
 export interface EGSUnitLocation {
     city: string,
@@ -37,8 +38,10 @@ export interface EGSUnitInfo {
     csr?: string,
     compliance_certificate?: string,
     compliance_api_secret?: string,
+    compliance_request_id?: string,
     production_certificate?: string,
     production_api_secret?: string,
+    production_request_id?: string
 }
 
 export interface EGSOptions {
@@ -124,55 +127,20 @@ const generateCSR = async (egs_info: EGSUnitInfo, production: boolean, solution_
     }
 }
 
-export class EGS {
+export class EGS extends AltavantUtil {
 
     private egs_info: EGSUnitInfo;
     private api: API;
     private solution_name: any;
-    public options: {private_key_file?: any, public_key_file?: any, csr_config_file?: any, csr_file?: any, compliance_response_file?: any, production_response_file?: any} = {};
-
+    
     constructor(egs_info: EGSUnitInfo, options: EGSOptions) {
-      const { solution_name, integration_files_dir, isProduction } = options;
-      this.solution_name = solution_name;
+      super({...options, egs_info});
+      this.solution_name = this.options.solution_name;
       this.egs_info = egs_info;
       this.api = new API();
-      this.options = {
-        private_key_file: `${integration_files_dir}/${egs_info.custom_id}-${solution_name}-private.pem`,
-        public_key_file: `${integration_files_dir}/${egs_info.custom_id}-${solution_name}-public.pem`,
-        csr_config_file: `${integration_files_dir}/${egs_info.custom_id}-${solution_name}.cnf`,
-        csr_file: `${integration_files_dir}/${egs_info.custom_id}-${solution_name}.csr`,
-        compliance_response_file: `${integration_files_dir}/${egs_info.custom_id}-${solution_name}-compliance-response.json`,
-        production_response_file: `${integration_files_dir}/${egs_info.custom_id}-${solution_name}-production-response.json`
-      };
 
-      this.loadCSIDJSONResponse(isProduction);
+      this.set(this.savedCSIDdata);
     }
-
-    loadCSIDJSONResponse(production?: boolean) {
-      try {
-        const path = production ? this.options.production_response_file : this.options.compliance_response_file;
-        const { issued_certificate, api_secret, request_id } = require(path);
-        const value = production
-          ?
-          {
-            production_certificate: issued_certificate,
-            production_api_secret: api_secret,
-            production_request_id: request_id
-          }
-          :
-          {
-            compliance_certificate: issued_certificate,
-            compliance_api_secret: api_secret,
-            compliance_request_id: request_id
-          }
-        ;
-
-        this.set(value);
-      } catch (error) {
-          
-      }
-    }
-
 
     /**
      * @returns EGSUnitInfo
@@ -254,18 +222,7 @@ export class EGS {
             throw error;
         }
     }
-
-    async generateKeys() {
-        const { private_key_file, public_key_file } = this.options;
-
-        // Generate Private Key
-        const new_private_key = await generateSecp256k1KeyPair();
-        fs.writeFileSync(private_key_file, new_private_key);
-
-        // Generate Public Key
-        await OpenSSL(["ec", "-in", private_key_file, "-pubout", "-conv_form", "compressed", "-out", public_key_file]);
-    }
-
+    
     getKeys() {
         const { private_key_file, public_key_file } = this.options;
         
@@ -288,6 +245,7 @@ export class EGS {
         const issued_data = await this.api.compliance().issueCertificate(this.egs_info.csr, OTP);
         this.egs_info.compliance_certificate = issued_data.issued_certificate;
         this.egs_info.compliance_api_secret = issued_data.api_secret;
+        this.egs_info.compliance_request_id = issued_data.request_id;
 
         return issued_data.request_id;
     }
@@ -304,6 +262,7 @@ export class EGS {
         this.egs_info.production_certificate = issued_data.issued_certificate;
         this.egs_info.production_api_secret = issued_data.api_secret;
         
+        fs.writeFileSync(this.options.production_response_file, JSON.stringify(issued_data), "utf8");
         return issued_data.request_id;
     }
 
