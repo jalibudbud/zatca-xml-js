@@ -41,6 +41,12 @@ export interface EGSUnitInfo {
     production_api_secret?: string,
 }
 
+export interface EGSOptions {
+  solution_name: string,
+  integration_files_dir: string,
+  isProduction?: boolean
+}
+
 const OpenSSL = (cmd: string[]): Promise<string> => {
     return new Promise<string>((resolve, reject) => {
         try {
@@ -123,18 +129,48 @@ export class EGS {
     private egs_info: EGSUnitInfo;
     private api: API;
     private solution_name: any;
-    public options: {private_key_file?: any, public_key_file?: any, csr_config_file?: any, csr_file?: any} = {};
+    public options: {private_key_file?: any, public_key_file?: any, csr_config_file?: any, csr_file?: any, compliance_response_file?: any, production_response_file?: any} = {};
 
-    constructor(egs_info: EGSUnitInfo, solution_name: string = 'EGSSolutionName') {
-        this.solution_name = solution_name;
-        this.egs_info = egs_info;
-        this.api = new API();
-        this.options = {
-            private_key_file: `${process.env.APP_PATH}/public/metadata/${egs_info.custom_id}-${solution_name}-private.pem`,
-            public_key_file: `${process.env.APP_PATH}/public/metadata/${egs_info.custom_id}-${solution_name}-public.pem`,
-            csr_config_file: `${process.env.APP_PATH}/public/metadata/${egs_info.custom_id}-${solution_name}.cnf`,
-            csr_file: `${process.env.APP_PATH}/public/metadata/${egs_info.custom_id}-${solution_name}.csr`
-        }
+    constructor(egs_info: EGSUnitInfo, options: EGSOptions) {
+      const { solution_name, integration_files_dir, isProduction } = options;
+      this.solution_name = solution_name;
+      this.egs_info = egs_info;
+      this.api = new API();
+      this.options = {
+        private_key_file: `${integration_files_dir}/${egs_info.custom_id}-${solution_name}-private.pem`,
+        public_key_file: `${integration_files_dir}/${egs_info.custom_id}-${solution_name}-public.pem`,
+        csr_config_file: `${integration_files_dir}/${egs_info.custom_id}-${solution_name}.cnf`,
+        csr_file: `${integration_files_dir}/${egs_info.custom_id}-${solution_name}.csr`,
+        compliance_response_file: `${integration_files_dir}/${egs_info.custom_id}-${solution_name}-compliance-response.json`,
+        production_response_file: `${integration_files_dir}/${egs_info.custom_id}-${solution_name}-production-response.json`
+      };
+
+      this.loadCSIDJSONResponse(isProduction);
+    }
+
+    loadCSIDJSONResponse(production?: boolean) {
+      try {
+        const path = production ? this.options.production_response_file : this.options.compliance_response_file;
+        const { issued_certificate, api_secret, request_id } = require(path);
+        const value = production
+          ?
+          {
+            production_certificate: issued_certificate,
+            production_api_secret: api_secret,
+            production_request_id: request_id
+          }
+          :
+          {
+            compliance_certificate: issued_certificate,
+            compliance_api_secret: api_secret,
+            compliance_request_id: request_id
+          }
+        ;
+
+        this.set(value);
+      } catch (error) {
+          
+      }
     }
 
 
