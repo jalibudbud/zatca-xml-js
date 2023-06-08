@@ -87,7 +87,7 @@ const generateSecp256k1KeyPair = async (): Promise<string> => {
 
 // Generate a signed ecdsaWithSHA256 CSR
 // 2.2.2 Profile specification of the Cryptographic Stamp identifiers. & CSR field contents / RDNs.
-const generateCSR = async (egs_info: EGSUnitInfo, production: boolean, solution_name: string): Promise<string> => {
+const generateCSR = async (egs_info: EGSUnitInfo, production: boolean, solution_name: string, altavantOptions: any = {}): Promise<string> => {
     if (!egs_info.private_key) throw new Error("EGS has no private key");
 
     // This creates a temporary private file, and csr config file to pass to OpenSSL in order to create and sign the CSR.
@@ -170,65 +170,8 @@ export class EGS extends AltavantUtil {
             const new_private_key = await generateSecp256k1KeyPair();
             this.egs_info.private_key = new_private_key;
 
-            const new_csr = await generateCSR(this.egs_info, production, solution_name);    
+            const new_csr = await generateCSR(this.egs_info, production, solution_name, this.options);    
             this.egs_info.csr = new_csr;
-        } catch (error) {
-            throw error;
-        }
-    }
-
-    async generateCSR(production: boolean): Promise<string> {
-        const egs_info: EGSUnitInfo = this.egs_info;
-
-        fs.writeFileSync(this.options.csr_config_file, defaultCSRConfig({
-            egs_model: egs_info.model,
-            egs_serial_number: egs_info.uuid,
-            solution_name: this.solution_name,
-            vat_number: egs_info.VAT_number,
-            branch_location: `${egs_info.location.building} ${egs_info.location.street}, ${egs_info.location.city}`,
-            branch_industry: egs_info.branch_industry,
-            branch_name: egs_info.branch_name,
-            taxpayer_name: egs_info.VAT_name,
-            taxpayer_provided_id: egs_info.custom_id,
-            production: production
-        }));
-        
-        try {    
-            const { private_key_file, csr_config_file, csr_file } = this.options;
-
-            // Generate CSR file
-            // await OpenSSL(["req", "-new", "-sha256", "-key", private_key_file, "-extensions", "v3_req", "-config", csr_config_file, "-out", csr_file]);
-    
-            const result = await OpenSSL(["req", "-new", "-sha256", "-key", private_key_file, "-config", csr_config_file]);
-            if (!result.includes("-----BEGIN CERTIFICATE REQUEST-----")) throw new Error("Error no CSR found in OpenSSL output.");
-    
-            let csr: string = `-----BEGIN CERTIFICATE REQUEST-----${result.split("-----BEGIN CERTIFICATE REQUEST-----")[1]}`.trim();
-            return csr;
-        } catch (error) {
-            throw error;
-        }
-    }
-
-    async getCSR() {
-        try {
-            const { private_key_file, csr_config_file } = this.options;
-            const result = await OpenSSL(["req", "-new", "-sha256", "-key", private_key_file, "-config", csr_config_file]);
-            if (!result.includes("-----BEGIN CERTIFICATE REQUEST-----")) throw new Error("Error no CSR found in OpenSSL output.");
-    
-            let csr: string = `-----BEGIN CERTIFICATE REQUEST-----${result.split("-----BEGIN CERTIFICATE REQUEST-----")[1]}`.trim();
-            this.egs_info.csr = csr;
-            return csr;
-        } catch (error) {
-            throw error;
-        }
-    }
-    
-    getKeys() {
-        const { private_key_file, public_key_file } = this.options;
-        
-        try {    
-            const privatekey = fs.readFileSync(private_key_file, { encoding: "utf8" });
-            this.egs_info.private_key = privatekey;
         } catch (error) {
             throw error;
         }

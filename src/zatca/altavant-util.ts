@@ -58,4 +58,19 @@ export class AltavantUtil {
       // Generate Public Key
       await OpenSSL(['ec', '-in', private_key_file, '-pubout', '-conv_form', 'compressed', '-out', public_key_file]);
   }
+
+  async getCSR() {
+    // tryac
+  }
+
+  getKeys() {
+      // const { private_key_file, public_key_file } = this._options;
+      
+      // try {    
+      //     const privatekey = fs.readFileSync(private_key_file, { encoding: "utf8" });
+      //     this.egs_info.private_key = privatekey;
+      // } catch (error) {
+      //     throw error;
+      // }
+  }
 }
