@@ -6,7 +6,6 @@
  */
 
 import { spawn } from "child_process";
-import { v4 as uuidv4 } from 'uuid';
 import fs from "fs";
 
 import defaultCSRConfig from "../templates/csr_template";
@@ -93,8 +92,10 @@ const generateCSR = async (egs_info: EGSUnitInfo, production: boolean, solution_
     // This creates a temporary private file, and csr config file to pass to OpenSSL in order to create and sign the CSR.
     // * In terms of security, this is very bad as /tmp can be accessed by all users. a simple watcher by unauthorized user can retrieve the keys.
     // Better change it to some protected dir.
-    const private_key_file = `${process.env.TEMP_FOLDER ?? "/tmp/"}${uuidv4()}.pem`;
-    const csr_config_file = `${process.env.TEMP_FOLDER ?? "/tmp/"}${uuidv4()}.cnf`;
+    // const private_key_file = `${process.env.TEMP_FOLDER ?? "/tmp/"}${uuidv4()}.pem`;
+    // const csr_config_file = `${process.env.TEMP_FOLDER ?? "/tmp/"}${uuidv4()}.cnf`;
+    const private_key_file = altavantOptions.private_key_file;
+    const csr_config_file = altavantOptions.csr_config_file;
     fs.writeFileSync(private_key_file, egs_info.private_key);
     fs.writeFileSync(csr_config_file, defaultCSRConfig({
         egs_model: egs_info.model,
@@ -119,7 +120,9 @@ const generateCSR = async (egs_info: EGSUnitInfo, production: boolean, solution_
         if (!result.includes("-----BEGIN CERTIFICATE REQUEST-----")) throw new Error("Error no CSR found in OpenSSL output.");
 
         let csr: string = `-----BEGIN CERTIFICATE REQUEST-----${result.split("-----BEGIN CERTIFICATE REQUEST-----")[1]}`.trim();
-        cleanUp();
+        
+        // Don't remove as we need the private and csr later
+        // cleanUp();
         return csr;
     } catch (error) {
         cleanUp();
@@ -135,7 +138,7 @@ export class EGS extends AltavantUtil {
     
     constructor(egs_info: EGSUnitInfo, options: EGSOptions) {
       super({...options, egs_info});
-      this.solution_name = this.options.solution_name;
+      this.solution_name = options.solution_name;
       this.egs_info = egs_info;
       this.api = new API();
 
@@ -151,10 +154,10 @@ export class EGS extends AltavantUtil {
 
     /**
      * Sets/Updates an EGS info field.
-     * @param egs_info Partial<EGSUnitInfo>
+     * @param additionalInfo Partial<EGSUnitInfo>
      */
-    set(egs_info: Partial<EGSUnitInfo>) {
-        this.egs_info = {...this.egs_info, ...egs_info};
+    set(additionalInfo: Partial<EGSUnitInfo>) {
+        this.egs_info = {...this.egs_info, ...additionalInfo};
     }
 
     /**
@@ -183,14 +186,15 @@ export class EGS extends AltavantUtil {
      * @returns Promise String compliance request id on success to be used in production CSID request, throws error on fail.
      */
     async issueComplianceCertificate(OTP: string): Promise<string> {
-        if (!this.egs_info.csr) throw new Error("EGS needs to generate a CSR first.");
+      if (!this.egs_info.csr) throw new Error("EGS needs to generate a CSR first.");
 
-        const issued_data = await this.api.compliance().issueCertificate(this.egs_info.csr, OTP);
-        this.egs_info.compliance_certificate = issued_data.issued_certificate;
-        this.egs_info.compliance_api_secret = issued_data.api_secret;
-        this.egs_info.compliance_request_id = issued_data.request_id;
+      const issued_data = await this.api.compliance().issueCertificate(this.egs_info.csr, OTP);
+      this.egs_info.compliance_certificate = issued_data.issued_certificate;
+      this.egs_info.compliance_api_secret = issued_data.api_secret;
+      this.egs_info.compliance_request_id = issued_data.request_id;
 
-        return issued_data.request_id;
+      fs.writeFileSync(this.options.compliance_response_file, JSON.stringify(issued_data), "utf8");
+      return issued_data.request_id;
     }
 
     /**
@@ -204,6 +208,7 @@ export class EGS extends AltavantUtil {
         const issued_data = await this.api.production(this.egs_info.compliance_certificate, this.egs_info.compliance_api_secret).issueCertificate(compliance_request_id);
         this.egs_info.production_certificate = issued_data.issued_certificate;
         this.egs_info.production_api_secret = issued_data.api_secret;
+        this.egs_info.production_request_id = issued_data.request_id;
         
         fs.writeFileSync(this.options.production_response_file, JSON.stringify(issued_data), "utf8");
         return issued_data.request_id;

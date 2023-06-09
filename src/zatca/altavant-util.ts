@@ -13,10 +13,16 @@ export class AltavantUtil {
       csr_config_file: `${integration_files_dir}/${egs_info.custom_id}-${solution_name}.cnf`,
       csr_file: `${integration_files_dir}/${egs_info.custom_id}-${solution_name}.csr`,
       compliance_response_file: `${integration_files_dir}/${egs_info.custom_id}-${solution_name}-compliance-response.json`,
-      production_response_file: `${integration_files_dir}/${egs_info.custom_id}-${solution_name}-production-response.json`
+      production_response_file: `${integration_files_dir}/${egs_info.custom_id}-${solution_name}-production-response.json`,
+      ...altavantOptions
     };
 
-    this.loadCSIDJSONResponse(isProduction);
+    delete this._options['egs_info'];
+
+    /**
+     * Load 
+     */
+    this.loadOnboardingData();
   }
 
   get options() {
@@ -27,26 +33,21 @@ export class AltavantUtil {
     return this._savedCSIDdata;
   }
   
-  loadCSIDJSONResponse(production?: boolean) {
+  loadOnboardingData() {
     try {
-      const path = production ? this.options.production_response_file : this.options.compliance_response_file;
-      const { issued_certificate, api_secret, request_id } = require(path);
-      this._savedCSIDdata = production
-        ?
-        {
-          production_certificate: issued_certificate,
-          production_api_secret: api_secret,
-          production_request_id: request_id
-        }
-        :
-        {
-          compliance_certificate: issued_certificate,
-          compliance_api_secret: api_secret,
-          compliance_request_id: request_id
-        }
-      ;
-    } catch (error) {
-        
+      const production = require(this.options.production_response_file);
+      const compliance = require(this.options.compliance_response_file);
+      this._savedCSIDdata = {
+        production_certificate: production.issued_certificate,
+        production_api_secret: production.api_secret,
+        production_request_id: production.request_id,
+        compliance_certificate: compliance.issued_certificate,
+        compliance_api_secret: compliance.api_secret,
+        compliance_request_id: compliance.request_id,
+        private_key: this.getKeys()
+      };
+    }
+    catch (error) {
     }
   }
 
@@ -64,13 +65,13 @@ export class AltavantUtil {
   }
 
   getKeys() {
-      // const { private_key_file, public_key_file } = this._options;
-      
-      // try {    
-      //     const privatekey = fs.readFileSync(private_key_file, { encoding: "utf8" });
-      //     this.egs_info.private_key = privatekey;
-      // } catch (error) {
-      //     throw error;
-      // }
+    const { private_key_file } = this._options;
+    
+    try {    
+        const privatekey = fs.readFileSync(private_key_file, { encoding: 'utf8' });
+        return privatekey;
+    } catch (error) {
+        throw error;
+    }
   }
 }
